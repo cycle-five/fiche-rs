@@ -290,7 +290,7 @@ fn handle_connection(mut connection: FicheConnection) {
                     ));
                     connection
                         .socket
-                        .write_all(format!("{}{}\n", connection.settings.domain, slug).as_bytes())
+                        .write_all(format!("{}/{}\n", connection.settings.domain, slug).as_bytes())
                         .unwrap();
                 }
                 Err(e) => {
@@ -325,7 +325,8 @@ fn generate_slug(settings: &FicheSettings) -> String {
     slug
 }
 
-// Implementation of the perform_user_change function in Rust
+/// Change the current user to the requested user
+/// FIXME: Getting an error somewhere...
 fn perform_user_change(settings: &FicheSettings) -> Result<(), String> {
     if let Some(user_name) = &settings.user_name {
         if !am_i_root() {
