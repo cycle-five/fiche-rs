@@ -156,7 +156,7 @@ fn fiche_run(mut settings: FicheSettings) -> Result<(), String> {
     if !output_dir_path.exists() {
         fs::create_dir_all(output_dir_path).map_err(|e| e.to_string())?;
     }
-    if !output_dir_path.metadata().unwrap().permissions().readonly() {
+    if output_dir_path.metadata().unwrap().permissions().readonly() {
         return Err("Output directory not writable!".to_string());
     }
 
@@ -288,6 +288,10 @@ fn handle_connection(mut connection: FicheConnection) {
                         "Data saved to: {}/index.txt",
                         directory_path.display()
                     ));
+                    connection
+                        .socket
+                        .write_all(format!("{}{}\n", connection.settings.domain, slug).as_bytes())
+                        .unwrap();
                 }
                 Err(e) => {
                     print_error(&format!("Failed to save data to file! {}", e));
