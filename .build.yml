@@ -1,0 +1,6 @@
+image: alpine/edge
+tasks:
+  - install-rust: |
+      apk add --no-cache rust cargo
+  - build: |
+      cargo build
