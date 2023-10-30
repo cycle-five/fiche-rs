@@ -1,4 +1,4 @@
-FROM alpine:latest
+FROM rust:alpine as build
 
 RUN apk add --no-cache rust cargo
 
@@ -8,4 +8,9 @@ COPY . .
 
 RUN cargo build --release
 
-CMD ["/app/target/release/fiche-rs"]
+FROM alpine:latest as runtime
+
+COPY --from=build /app/target/release/fiche-rs .
+RUN pwd && ls -al
+
+CMD ["/fiche-rs"]
