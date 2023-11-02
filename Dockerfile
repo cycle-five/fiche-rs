@@ -1,6 +1,6 @@
 FROM rust:alpine as build
 
-RUN apk add --no-cache rust cargo
+RUN apk add --no-cache rust cargo rust-clippy
 
 WORKDIR /app
 

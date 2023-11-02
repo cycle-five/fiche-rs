@@ -1,9 +1,7 @@
 image: alpine/edge
 tasks:
   - install-rust: |
-      sudo apk add --no-cache rust cargo
-  - install-clippy: |
-      rustup component add clippy
+      sudo apk add --no-cache rust cargo rust-clippy
   - test: |
       cd fiche-rs
       cargo test
