@@ -2,6 +2,9 @@ image: alpine/edge
 tasks:
   - install-rust: |
       sudo apk add --no-cache rust cargo
-  - build: |
+  - test: |
       cd fiche-rs
-      cargo build --release
+      cargo test
+  - lint: |
+      cd fiche-rs
+      cargo clippy --all -- -D clippy::all -D warning

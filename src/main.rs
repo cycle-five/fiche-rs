@@ -12,24 +12,25 @@ use users::{get_group_by_name, get_user_by_name};
 // Define constants
 const FICHE_SYMBOLS: &str = "abcdefghijklmnopqrstuvwxyz0123456789";
 
-use clap::Parser;
-
 // Define the FicheSettings struct
 #[derive(Clone, Debug)]
-struct FicheSettings {
-    domain: String,
-    output_dir: String,
-    listen_addr: String,
-    port: u16,
-    slug_len: usize,
-    https: bool,
-    buffer_len: usize,
-    user_name: Option<String>,
-    log_file_path: Option<String>,
-    banlist_path: Option<String>,
-    whitelist_path: Option<String>,
+pub struct FicheSettings {
+    pub domain: String,
+    pub output_dir: String,
+    pub listen_addr: String,
+    pub port: u16,
+    pub slug_len: usize,
+    pub https: bool,
+    pub buffer_len: usize,
+    pub user_name: Option<String>,
+    pub log_file_path: Option<String>,
+    pub banlist_path: Option<String>,
+    pub whitelist_path: Option<String>,
 }
 
+use clap::Parser;
+/// semi-sane defaults, the program won't run under these settings howerever.
+/// FIXME
 impl Default for FicheSettings {
     fn default() -> Self {
         FicheSettings {
@@ -48,24 +49,28 @@ impl Default for FicheSettings {
     }
 }
 
+/// implements the new method for the FicheSettings struct to parse from
+/// command-line arguments.
 impl FicheSettings {
     fn new(args: &Args) -> Self {
-        let mut settings = FicheSettings::default();
-        settings.domain = args.domain.clone();
-        settings.output_dir = args.output_directory.clone();
-        settings.listen_addr = args.listen.clone();
-        settings.port = args.port;
-        settings.slug_len = args.slug_length;
-        settings.https = args.ssl;
-        settings.buffer_len = args.buffer_length;
-        settings.user_name = args.user.clone();
-        settings.log_file_path = args.log.clone();
-        settings.banlist_path = args.banlist.clone();
-        settings.whitelist_path = args.whitelist.clone();
-        settings
+        FicheSettings {
+            domain: args.domain.clone(),
+            output_dir: args.output_directory.clone(),
+            listen_addr: args.listen.clone(),
+            port: args.port,
+            slug_len: args.slug_length,
+            https: args.ssl,
+            buffer_len: args.buffer_length,
+            user_name: args.user.clone(),
+            log_file_path: args.log.clone(),
+            banlist_path: args.banlist.clone(),
+            whitelist_path: args.whitelist.clone(),
+        }
     }
 }
 
+/// The FicheConnection struct represents a connection to the server.
+/// It contains the socket, the address of the client, and the settings.
 struct FicheConnection {
     socket: TcpStream,
     address: SocketAddr,
@@ -129,6 +134,7 @@ struct Args {
     whitelist: Option<String>,
 }
 
+/// The main function
 fn main() -> Result<(), String> {
     // Define the command-line interface using the clap crate
 
@@ -184,6 +190,7 @@ fn fiche_run(mut settings: FicheSettings) -> Result<(), String> {
     Ok(())
 }
 
+/// Start the server
 fn start_server(settings: FicheSettings) -> Result<(), String> {
     // ... (Implementation of the fiche_run function)
     // Run dispatching loop
@@ -203,6 +210,7 @@ fn start_server(settings: FicheSettings) -> Result<(), String> {
     }
 }
 
+/// Set the domain name
 fn set_domain_name(settings: &mut FicheSettings) {
     settings.domain = if settings.https {
         format!("https://{}", settings.domain)
@@ -227,6 +235,7 @@ fn set_domain_name(settings: &mut FicheSettings) {
 //     }
 // }
 
+/// Dispatch a connection
 fn dispatch_connection(socket: TcpStream, settings: Arc<FicheSettings>) {
     // Set timeout for accepted socket
     let timeout = Duration::new(5, 0);
@@ -241,6 +250,7 @@ fn dispatch_connection(socket: TcpStream, settings: Arc<FicheSettings>) {
     handle_connection(connection);
 }
 
+/// Check if IP is banned
 fn is_banned(connection: &FicheConnection) -> bool {
     if let Some(banlist_path) = &connection.settings.banlist_path {
         let banlist = fs::read_to_string(banlist_path).unwrap();
@@ -251,6 +261,7 @@ fn is_banned(connection: &FicheConnection) -> bool {
     }
 }
 
+/// Check if IP is whitelisted
 fn is_whitelisted(connection: &FicheConnection) -> bool {
     if let Some(whitelist_path) = &connection.settings.whitelist_path {
         let whitelist = fs::read_to_string(whitelist_path).unwrap();
@@ -261,6 +272,7 @@ fn is_whitelisted(connection: &FicheConnection) -> bool {
     }
 }
 
+/// Handle a connection
 fn handle_connection(mut connection: FicheConnection) {
     // ... (Implementation of the handle_connection function)
     let ip = connection.address.ip().to_string();
@@ -304,6 +316,7 @@ fn handle_connection(mut connection: FicheConnection) {
     }
 }
 
+/// Generate a random slug
 fn generate_slug(settings: &FicheSettings) -> String {
     let symbols = FICHE_SYMBOLS; // "abcdefghijklmnopqrstuvwxyz0123456789";
     let mut rng = rand::thread_rng();
@@ -347,6 +360,8 @@ fn perform_user_change(settings: &FicheSettings) -> Result<(), String> {
 
     Ok(())
 }
+
+/// Gets the user ID (uid) by user name from the OS users.
 fn get_uid_by_name(user_name: &str) -> Option<u32> {
     // Retrieve the User struct by user name
     let user = get_user_by_name(user_name);
@@ -355,6 +370,7 @@ fn get_uid_by_name(user_name: &str) -> Option<u32> {
     user.map(|u| u.uid())
 }
 
+/// Gets the group ID (gid) by group name from the OS groups.
 fn get_gid_by_name(group_name: &str) -> Option<u32> {
     // Retrieve the Group struct by group name
     let group = get_group_by_name(group_name);
@@ -362,12 +378,15 @@ fn get_gid_by_name(group_name: &str) -> Option<u32> {
     // Return the group ID (gid) if the Group struct is found
     group.map(|g| g.gid())
 }
+
+/// Create a directory for a slug
 fn create_directory(output_dir: &str, slug: &str) -> PathBuf {
     let directory_path = Path::new(output_dir).join(slug);
     fs::create_dir_all(&directory_path).unwrap();
     directory_path
 }
 
+/// Save data to a file
 fn save_to_file(directory_path: &Path, data: &[u8]) -> Result<(), std::io::Error> {
     let file_path = directory_path.join("index.txt");
     let mut file = File::create(file_path)?;
@@ -375,14 +394,17 @@ fn save_to_file(directory_path: &Path, data: &[u8]) -> Result<(), std::io::Error
     Ok(())
 }
 
+/// Print an error message to the console
 fn print_error(message: &str) {
     eprintln!("[Fiche][ERROR] {}", message);
 }
 
+/// Print a status message to the console
 fn print_status(message: &str) {
     println!("[Fiche][STATUS] {}", message);
 }
 
+/// Get the hostname from a SocketAddr
 fn get_hostname(address: &SocketAddr) -> String {
     // Convert the SocketAddr to a string in the form of "ip:port"
     let addr_string = address.to_string();
@@ -406,12 +428,41 @@ fn get_hostname(address: &SocketAddr) -> String {
     }
 }
 
+/// Get the current date and time as a string
 fn get_date() -> String {
     let now = time::SystemTime::now();
     let datetime: chrono::DateTime<chrono::Utc> = now.into();
     datetime.format("%Y-%m-%d %H:%M:%S").to_string()
 }
 
+/// Check if we're running as root
 fn am_i_root() -> bool {
     unsafe { libc::getuid() == 0 }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::FicheSettings;
+
+    #[test]
+    fn test_fiche_settings_defaults() {
+        let default_settings = FicheSettings::default();
+        assert_eq!(default_settings.domain, "example.com");
+        assert_eq!(default_settings.output_dir, "code");
+        assert_eq!(default_settings.listen_addr, "0.0.0.0");
+        assert_eq!(default_settings.port, 9999);
+        assert_eq!(default_settings.slug_len, 4);
+        assert_eq!(default_settings.https, false);
+        assert_eq!(default_settings.buffer_len, 32768);
+        assert_eq!(default_settings.user_name, None);
+        assert_eq!(default_settings.log_file_path, None);
+        assert_eq!(default_settings.banlist_path, None);
+        assert_eq!(default_settings.whitelist_path, None);
+    }
+
+    #[test]
+    fn test_get_uid_by_name() {
+        let uid = crate::get_uid_by_name("root");
+        assert_eq!(uid, Some(0));
+    }
 }
