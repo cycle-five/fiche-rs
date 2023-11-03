@@ -7,4 +7,4 @@ tasks:
       cargo test
   - lint: |
       cd fiche-rs
-      cargo clippy --all -- -D clippy::all -D warning
+      cargo clippy --all -- -D clippy::all -D warnings
