@@ -5,9 +5,12 @@ tasks:
       source "$HOME/.cargo/env"
       rustup default stable
       rustup component add clippy
+      cargo install cargo-tarpaulin
   - test: |
+      source "$HOME/.cargo/env"
       cd fiche-rs
-      cargo test
+      cargo tarpaulin
   - lint: |
+      source "$HOME/.cargo/env"
       cd fiche-rs
       cargo clippy --all -- -D clippy::all -D warnings

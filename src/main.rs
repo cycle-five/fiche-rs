@@ -1,4 +1,5 @@
 use rand::Rng;
+use std::error::Error;
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs};
@@ -11,6 +12,9 @@ use users::{get_group_by_name, get_user_by_name};
 
 // Define constants
 const FICHE_SYMBOLS: &str = "abcdefghijklmnopqrstuvwxyz0123456789";
+
+// Define the FicheError enum
+type FicheError = Box<dyn Error + Send + Sync>;
 
 // Define the FicheSettings struct
 #[derive(Clone, Debug)]
@@ -71,9 +75,10 @@ impl FicheSettings {
 
 /// The FicheConnection struct represents a connection to the server.
 /// It contains the socket, the address of the client, and the settings.
+#[derive(Default)]
 struct FicheConnection {
-    socket: TcpStream,
-    address: SocketAddr,
+    socket: Option<TcpStream>,
+    address: Option<SocketAddr>,
     settings: Arc<FicheSettings>,
 }
 
@@ -199,9 +204,7 @@ fn start_server(settings: FicheSettings) -> Result<(), String> {
         match listener.accept() {
             Ok((socket, _)) => {
                 let settings = Arc::new(settings.clone());
-                thread::spawn(move || {
-                    dispatch_connection(socket, settings);
-                });
+                thread::spawn(move || dispatch_connection(socket, settings));
             }
             Err(e) => {
                 print_error(&format!("Error on accepting connection! {}", e));
@@ -236,25 +239,25 @@ fn set_domain_name(settings: &mut FicheSettings) {
 // }
 
 /// Dispatch a connection
-fn dispatch_connection(socket: TcpStream, settings: Arc<FicheSettings>) {
+fn dispatch_connection(socket: TcpStream, settings: Arc<FicheSettings>) -> Result<(), FicheError> {
     // Set timeout for accepted socket
     let timeout = Duration::new(5, 0);
-    socket.set_read_timeout(Some(timeout)).unwrap();
-    socket.set_write_timeout(Some(timeout)).unwrap();
-    let addr = socket.peer_addr().unwrap();
+    socket.set_read_timeout(Some(timeout))?;
+    socket.set_write_timeout(Some(timeout))?;
+    let addr = socket.peer_addr().ok();
     let connection = FicheConnection {
-        socket,
+        socket: Some(socket),
         address: addr,
         settings,
     };
-    handle_connection(connection);
+    handle_connection(connection)
 }
 
 /// Check if IP is banned
 fn is_banned(connection: &FicheConnection) -> bool {
     if let Some(banlist_path) = &connection.settings.banlist_path {
         let banlist = fs::read_to_string(banlist_path).unwrap();
-        let ip = connection.address.ip().to_string();
+        let ip = connection.address.expect("No IP.").ip().to_string();
         banlist.contains(&ip)
     } else {
         false
@@ -265,7 +268,7 @@ fn is_banned(connection: &FicheConnection) -> bool {
 fn is_whitelisted(connection: &FicheConnection) -> bool {
     if let Some(whitelist_path) = &connection.settings.whitelist_path {
         let whitelist = fs::read_to_string(whitelist_path).unwrap();
-        let ip = connection.address.ip().to_string();
+        let ip = connection.address.expect("No IP").ip().to_string();
         whitelist.contains(&ip)
     } else {
         false
@@ -273,10 +276,13 @@ fn is_whitelisted(connection: &FicheConnection) -> bool {
 }
 
 /// Handle a connection
-fn handle_connection(mut connection: FicheConnection) {
-    // ... (Implementation of the handle_connection function)
-    let ip = connection.address.ip().to_string();
-    let hostname = get_hostname(&connection.address);
+fn handle_connection(mut connection: FicheConnection) -> Result<(), FicheError> {
+    if connection.address.is_none() {
+        return Err(FicheError::from("No address".to_string()));
+    }
+    let socket_addr = unsafe { &connection.address.unwrap_unchecked() };
+    let ip = socket_addr.ip().to_string();
+    let hostname = get_hostname(socket_addr);
     let date = get_date();
     print_status(&format!(
         "{} -- Connection from {} ({})",
@@ -286,11 +292,13 @@ fn handle_connection(mut connection: FicheConnection) {
     // check if IP is banned
     if is_banned(&connection) && !is_whitelisted(&connection) {
         print_error(&format!("{} is banned!", ip));
-        return;
+        return Err(FicheError::from("IP is banned!".to_string()));
     }
 
+    let stream = connection.socket.as_mut().expect("No socket");
+
     let mut buffer = vec![0u8; connection.settings.buffer_len];
-    match connection.socket.read(&mut buffer) {
+    match stream.read(&mut buffer) {
         Ok(received) if received > 0 => {
             let slug = generate_slug(&connection.settings);
             let directory_path = create_directory(&connection.settings.output_dir, &slug);
@@ -300,18 +308,19 @@ fn handle_connection(mut connection: FicheConnection) {
                         "Data saved to: {}/index.txt",
                         directory_path.display()
                     ));
-                    connection
-                        .socket
+                    stream
                         .write_all(format!("{}/{}\n", connection.settings.domain, slug).as_bytes())
-                        .unwrap();
+                        .map_err(|e| e.into())
                 }
                 Err(e) => {
                     print_error(&format!("Failed to save data to file! {}", e));
+                    Err(e.into())
                 }
             }
         }
         _ => {
             print_error("No data received from the client!");
+            Err(FicheError::from("No data received from the client!"))
         }
     }
 }
@@ -442,6 +451,8 @@ fn am_i_root() -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use crate::FicheSettings;
 
     #[test]
@@ -464,5 +475,104 @@ mod tests {
     fn test_get_uid_by_name() {
         let uid = crate::get_uid_by_name("root");
         assert_eq!(uid, Some(0));
+    }
+
+    #[test]
+    fn test_get_gid_by_name() {
+        let gid = crate::get_gid_by_name("root");
+        assert_eq!(gid, Some(0));
+    }
+
+    #[test]
+    fn test_generate_slug() {
+        let settings = FicheSettings::default();
+        let slug = crate::generate_slug(&settings);
+        assert_eq!(slug.len(), 4);
+    }
+
+    #[test]
+    fn test_create_directory() {
+        let settings = FicheSettings::default();
+        let slug = crate::generate_slug(&settings);
+        let directory_path = crate::create_directory(&settings.output_dir, &slug);
+        assert!(directory_path.exists());
+    }
+
+    #[test]
+    fn test_save_to_file() {
+        let settings = FicheSettings::default();
+        let slug = crate::generate_slug(&settings);
+        let directory_path = crate::create_directory(&settings.output_dir, &slug);
+        let data = b"Hello, world!";
+        let result = crate::save_to_file(&directory_path, data);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_get_hostname() {
+        let address = "127.0.0.1:8080".parse().unwrap();
+        let hostname = crate::get_hostname(&address);
+        assert_eq!(hostname, "127.0.0.1");
+    }
+
+    #[test]
+    fn test_get_date() {
+        let date = crate::get_date();
+        assert_eq!(date.len(), 19);
+    }
+
+    #[test]
+    fn test_am_i_root() {
+        let result = crate::am_i_root();
+        assert_eq!(result, false);
+    }
+
+    #[test]
+    fn test_set_domain_name() {
+        let mut settings = FicheSettings::default();
+        crate::set_domain_name(&mut settings);
+        assert_eq!(settings.domain, "http://example.com");
+    }
+
+    #[test]
+    fn test_perform_user_change() {
+        let settings = FicheSettings::default();
+        let result = crate::perform_user_change(&settings);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_is_banned() {
+        let settings = Arc::new(FicheSettings::default());
+        let connection = crate::FicheConnection {
+            socket: None,
+            address: None,
+            settings: settings.clone(),
+        };
+        let result = crate::is_banned(&connection);
+        assert_eq!(result, false);
+    }
+
+    #[test]
+    fn test_is_whitelisted() {
+        let settings = Arc::new(FicheSettings::default());
+        let connection = crate::FicheConnection {
+            socket: None,
+            address: None,
+            settings: settings.clone(),
+        };
+        let result = crate::is_whitelisted(&connection);
+        assert_eq!(result, false);
+    }
+
+    #[test]
+    fn test_handle_connection() {
+        let settings = Arc::new(FicheSettings::default());
+        let connection = crate::FicheConnection {
+            socket: None,
+            address: None,
+            settings: settings.clone(),
+        };
+        assert!(crate::handle_connection(connection).is_err());
     }
 }
