@@ -248,9 +248,17 @@ fn set_host_name(domain_name: &str) -> Result<(), FicheError> {
 
     let result = {
         let _cur_hostname_len = unsafe { libc::gethostname(buf, 256) };
-        let cur_hostname = unsafe { std::ffi::CStr::from_ptr(buf) };
+        let cur_hostname = unsafe {
+            let cstr_buf = buf as *const std::os::raw::c_char;
+            std::ffi::CStr::from_ptr(cstr_buf.try_into().unwrap())
+        };
         if cur_hostname.to_str().unwrap() == domain_name {
-            unsafe { libc::sethostname(cstr_domain_name.as_ptr(), domain_name.len()) }
+            unsafe {
+                libc::sethostname(
+                    cstr_domain_name.as_ptr().try_into().unwrap(),
+                    domain_name.len().try_into().unwrap(),
+                )
+            }
         } else {
             0
         }
