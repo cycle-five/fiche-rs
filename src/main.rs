@@ -514,8 +514,21 @@ mod tests {
 
     #[test]
     fn test_get_gid_by_name() {
-        let gid = crate::get_gid_by_name("root");
-        assert_eq!(gid, Some(0));
+        #[cfg(not(target_os = "macos"))]
+        let (grp_name, grp_id) = {
+            let grp_name = "root";
+            let grp_id = 0;
+            (grp_name, grp_id)
+        };
+        #[cfg(target_os = "macos")]
+        let (grp_name, grp_id) = {
+            let grp_name = "admin";
+            let grp_id = 80;
+            (grp_name, grp_id)
+        };
+
+        let gid = crate::get_gid_by_name(grp_name);
+        assert_eq!(gid, Some(grp_id));
     }
 
     #[test]
