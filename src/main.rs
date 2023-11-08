@@ -8,8 +8,13 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread;
 use std::time::{self, Duration};
-use users::switch::{set_current_gid, set_current_uid};
-use users::{get_group_by_name, get_user_by_name};
+#[cfg(target_os = "windows")]
+use ::{std::ptr, winapi, winapi::um::winbase::LookupAccountNameW, winapi::um::winnt::PSID};
+#[cfg(not(target_os = "windows"))]
+use ::{
+    users::switch::{set_current_gid, set_current_uid},
+    users::{get_group_by_name, get_user_by_name},
+};
 
 // Define constants
 const FICHE_SYMBOLS: &str = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -405,6 +410,7 @@ fn perform_user_change(settings: &FicheSettings) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(not(target_os = "windows"))]
 /// Gets the user ID (uid) by user name from the OS users.
 fn get_uid_by_name(user_name: &str) -> Option<u32> {
     // Retrieve the User struct by user name
@@ -412,6 +418,12 @@ fn get_uid_by_name(user_name: &str) -> Option<u32> {
 
     // Return the user ID (uid) if the User struct is found
     user.map(|u| u.uid())
+}
+#[cfg(target_os = "windows")]
+/// Unimplemented for Windows
+fn get_uid_by_name(user_name: &str) -> Option<u32> {
+    let psid: Option<PSID> = get_user_sid_by_name(user_name);
+    psid.map(|x| x.to_string().parse::<u32>().unwrap())
 }
 
 /// Gets the group ID (gid) by group name from the OS groups.
@@ -514,21 +526,27 @@ mod tests {
 
     #[test]
     fn test_get_gid_by_name() {
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(target_os = "windows")]
         let (grp_name, grp_id) = {
             let grp_name = "root";
-            let grp_id = 0;
+            let grp_id = None;
+            (grp_name, grp_id)
+        };
+        #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+        let (grp_name, grp_id) = {
+            let grp_name = "root";
+            let grp_id = Some(0);
             (grp_name, grp_id)
         };
         #[cfg(target_os = "macos")]
         let (grp_name, grp_id) = {
             let grp_name = "admin";
-            let grp_id = 80;
+            let grp_id = Some(80);
             (grp_name, grp_id)
         };
 
         let gid = crate::get_gid_by_name(grp_name);
-        assert_eq!(gid, Some(grp_id));
+        assert_eq!(gid, grp_id);
     }
 
     #[test]
