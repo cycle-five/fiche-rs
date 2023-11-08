@@ -73,6 +73,7 @@ impl FicheSettings {
         }
     }
 
+    #[allow(dead_code)]
     fn user(self, user: String) -> Self {
         Self {
             user_name: Some(user),

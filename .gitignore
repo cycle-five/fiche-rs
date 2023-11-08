@@ -1,1 +1,6 @@
+# binary
 /target
+# file outputs
+/code
+# code coverage
+cobertura.xml

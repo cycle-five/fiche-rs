@@ -9,15 +9,16 @@ tasks:
       rustup component add clippy
       curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | sh
       cargo binstall -y --force cargo-tarpaulin
+  - test: |
+      source "$HOME/.cargo/env"
+      cd fiche-rs
+      cargo tarpaulin --out xml
   - codecov: |
+      cd fiche-rs
       export CODECOV_TOKEN="$(cat ~/codecov_token)"
       curl -Os https://uploader.codecov.io/latest/alpine/codecov
       chmod +x codecov
       ./codecov
-  - test: |
-      source "$HOME/.cargo/env"
-      cd fiche-rs
-      cargo tarpaulin
   - lint: |
       source "$HOME/.cargo/env"
       cd fiche-rs
