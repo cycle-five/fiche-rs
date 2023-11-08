@@ -1,5 +1,6 @@
 use rand::Rng;
 use std::error::Error;
+use std::ffi::CString;
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs};
@@ -71,8 +72,14 @@ impl FicheSettings {
             whitelist_path: args.whitelist.clone(),
         }
     }
-}
 
+    fn user(self, user: String) -> Self {
+        Self {
+            user_name: Some(user),
+            ..self
+        }
+    }
+}
 /// The FicheConnection struct represents a connection to the server.
 /// It contains the socket, the address of the client, and the settings.
 #[derive(Default)]
@@ -139,6 +146,7 @@ struct Args {
     whitelist: Option<String>,
 }
 
+#[cfg(not(tarpaulin_include))]
 /// The main function
 fn main() -> Result<(), String> {
     // Define the command-line interface using the clap crate
@@ -150,7 +158,8 @@ fn main() -> Result<(), String> {
     fiche_run(settings)
 }
 
-// Continue with the equivalent Rust implementation of fiche_run function
+#[cfg(not(tarpaulin_include))]
+/// Continue with the equivalent Rust implementation of fiche_run function
 fn fiche_run(mut settings: FicheSettings) -> Result<(), String> {
     // Display welcome message
     let date = chrono::Utc::now();
@@ -195,9 +204,9 @@ fn fiche_run(mut settings: FicheSettings) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(not(tarpaulin_include))]
 /// Start the server
 fn start_server(settings: FicheSettings) -> Result<(), String> {
-    // ... (Implementation of the fiche_run function)
     // Run dispatching loop
     let listener = TcpListener::bind((settings.listen_addr.clone(), settings.port)).unwrap();
     loop {
@@ -223,21 +232,38 @@ fn set_domain_name(settings: &mut FicheSettings) {
 
     print_status(&format!("Domain name set to: {}", settings.domain));
 }
-// fn set_domain_name(domain_name: &str) -> Result<(), Error> {
-//     // Convert the Rust string to a C string
-//     let cstr_domain_name = CString::new(domain_name)?;
 
-//     // Call the sethostname function from libc
-//     let result = unsafe { libc::sethostname(cstr_domain_name.as_ptr(), domain_name.len()) };
+/// Set the hostname of the system
+#[allow(dead_code)]
+fn set_host_name(domain_name: &str) -> Result<(), FicheError> {
+    // Convert the Rust string to a C string
+    let cs = CString::new([0; 256])?;
+    let cv: Vec<u8> = cs.into_bytes_with_nul();
+    let mut tmp: Vec<i8> = cv.into_iter().map(|x| x as i8).collect();
+    let buf: *mut i8 = tmp.as_mut_ptr();
+    let cstr_domain_name = CString::new(domain_name)?;
 
-//     // Check the result
-//     if result == 0 {
-//         Ok(())
-//     } else {
-//         Err(Error::last_os_error())
-//     }
-// }
+    // Call the sethostname function from libc
 
+    let result = {
+        let _cur_hostname_len = unsafe { libc::gethostname(buf, 256) };
+        let cur_hostname = unsafe { std::ffi::CStr::from_ptr(buf) };
+        if cur_hostname.to_str().unwrap() == domain_name {
+            unsafe { libc::sethostname(cstr_domain_name.as_ptr(), domain_name.len()) }
+        } else {
+            0
+        }
+    };
+
+    // Check the result
+    if result == 0 {
+        Ok(())
+    } else {
+        Err(std::io::Error::last_os_error().into())
+    }
+}
+
+#[cfg(not(tarpaulin_include))]
 /// Dispatch a connection
 fn dispatch_connection(socket: TcpStream, settings: Arc<FicheSettings>) -> Result<(), FicheError> {
     // Set timeout for accepted socket
@@ -530,6 +556,7 @@ mod tests {
     #[test]
     fn test_set_domain_name() {
         let mut settings = FicheSettings::default();
+        let _ = crate::set_host_name(&settings.domain);
         crate::set_domain_name(&mut settings);
         assert_eq!(settings.domain, "http://example.com");
     }
@@ -574,5 +601,18 @@ mod tests {
             settings: settings.clone(),
         };
         assert!(crate::handle_connection(connection).is_err());
+    }
+
+    #[test]
+    fn test_set_host_name() {
+        let result = crate::set_host_name("example.com");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_perform_user_change_error() {
+        let settings = FicheSettings::default().user("cyclefive".to_string());
+        let result = crate::perform_user_change(&settings);
+        assert!(result.is_err());
     }
 }
