@@ -250,6 +250,7 @@ fn set_domain_name(settings: &mut FicheSettings) {
 }
 
 #[cfg(target_os = "windows")]
+#[allow(dead_code)]
 fn set_host_name(domain_name: &str) -> Result<(), FicheError> {
     hostname::set(domain_name).map_err(|e| e.into())
 }
