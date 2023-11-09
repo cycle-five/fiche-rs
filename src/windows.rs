@@ -6,8 +6,8 @@ use winapi::um::handleapi::CloseHandle;
 use winapi::um::processthreadsapi::{self, GetCurrentProcess};
 use winapi::um::securitybaseapi;
 use winapi::um::winbase::LookupAccountNameW;
-use winapi::um::winnt::PSID;
-use winapi::um::winnt::{HANDLE, TOKEN_ELEVATION, TOKEN_QUERY};
+use winapi::um::winnt::{HANDLE, TOKEN_ELEVATION};
+use winapi::um::winnt::{PSID, TOKEN_ALL_ACCESS_P};
 
 // ChatGPT's hopefully not hallucinatory advice.
 //
@@ -68,7 +68,10 @@ pub fn get_user_sid_by_name(user_name: &str) -> Option<PSID> {
             &mut e_use,
         );
 
-        sid = Vec::with_capacity(cb_sid as usize).as_mut_ptr() as PSID;
+        // println!("{}", cb_sid);
+        // Windows characters are 16bits and we need enough for cb_sid size of them.
+        let mut buf = Vec::<i16>::with_capacity(cb_sid as usize);
+        sid = buf.as_mut_ptr() as PSID;
         domain_name.reserve(cb_domain_name as usize);
 
         if LookupAccountNameW(
@@ -97,12 +100,21 @@ pub fn am_i_root_windows() -> bool {
         let current_process: HANDLE = GetCurrentProcess();
         let mut token_handle: HANDLE = std::ptr::null_mut();
 
+        println!("Opened current process");
+
         // Try to open the process token
-        if processthreadsapi::OpenProcessToken(current_process, TOKEN_QUERY, &mut token_handle) == 0
-        {
-            println!("Failed to open process token: {}", GetLastError());
+        let cur_process_token = processthreadsapi::OpenProcessToken(
+            current_process,
+            TOKEN_ALL_ACCESS_P,
+            &mut token_handle,
+        );
+        if cur_process_token == 0 {
+            let err_str: String = GetLastError().to_string();
+            println!("Failed to open process token: {}", err_str);
             return false;
         }
+
+        println!("Got process token");
 
         let mut elevation: TOKEN_ELEVATION = std::mem::zeroed();
         let mut returned_size = 0;
