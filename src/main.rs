@@ -725,6 +725,9 @@ mod tests {
     #[test]
     fn test_set_host_name() {
         let result = crate::set_host_name("helheim");
+        #[cfg(target_os = "windows")]
+        assert!(result.is_ok());
+        #[cfg(not(target_os = "windows"))]
         assert!(result.is_err());
     }
 
