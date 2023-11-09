@@ -249,6 +249,11 @@ fn set_domain_name(settings: &mut FicheSettings) {
     print_status(&format!("Domain name set to: {}", settings.domain));
 }
 
+#[cfg(target_os = "windows")]
+fn set_host_name(domain_name: &str) -> Result<(), FicheError> {
+    hostname::set(domain_name).map_err(|e| e.into())
+}
+
 /// Set the hostname of the system
 #[cfg(not(target_os = "windows"))]
 #[allow(dead_code)]
@@ -269,7 +274,12 @@ fn set_host_name(domain_name: &str) -> Result<(), FicheError> {
             std::ffi::CStr::from_ptr(cstr_buf)
         };
         if cur_hostname.to_str().unwrap() == domain_name {
-            unsafe { libc::sethostname(cstr_domain_name.as_ptr(), domain_name.len()) }
+            #[cfg(target_os = "macos")]
+            let domain_name_len: i32 = domain_name.len().try_into().unwrap();
+            #[cfg(not(target_os = "macos"))]
+            let domain_name_len: usize = domain_name.len();
+
+            unsafe { libc::sethostname(cstr_domain_name.as_ptr(), domain_name_len) }
         } else {
             0
         }
@@ -651,17 +661,21 @@ mod tests {
 
     #[test]
     fn test_am_i_root() {
+        #[cfg(not(target_os = "windows"))]
+        let expected = false;
+        #[cfg(target_os = "windows")]
+        let expected = true;
         let result = crate::am_i_root();
-        assert_eq!(result, false);
+        assert_eq!(result, expected);
     }
 
-    // #[test]
-    // fn test_set_domain_name() {
-    //     let mut settings = FicheSettings::default();
-    //     let _ = crate::set_host_name(&settings.domain);
-    //     crate::set_domain_name(&mut settings);
-    //     assert_eq!(settings.domain, "http://example.com");
-    // }
+    #[test]
+    fn test_set_domain_name() {
+        let mut settings = FicheSettings::default();
+        let _ = crate::set_host_name(&settings.domain);
+        crate::set_domain_name(&mut settings);
+        assert_eq!(settings.domain, "http://example.com");
+    }
 
     #[test]
     fn test_perform_user_change() {
@@ -708,11 +722,11 @@ mod tests {
         assert!(crate::handle_connection(connection).is_err());
     }
 
-    // #[test]
-    // fn test_set_host_name() {
-    //     let result = crate::set_host_name("example.com");
-    //     assert!(result.is_err());
-    // }
+    #[test]
+    fn test_set_host_name() {
+        let result = crate::set_host_name("helheim");
+        assert!(result.is_err());
+    }
 
     #[test]
     fn test_perform_user_change_error() {

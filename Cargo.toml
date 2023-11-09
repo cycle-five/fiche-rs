@@ -9,6 +9,7 @@ edition = "2021"
 chrono = "0.4"
 rand = "0.8"
 libc = "0.2"
+hostname = { version = "0.3.1", features = ["set"] }
 clap = { version = "4.4", features = ["derive"] }
 
 # Unix specific dependencies
