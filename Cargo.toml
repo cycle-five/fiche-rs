@@ -7,7 +7,24 @@ edition = "2021"
 
 [dependencies]
 chrono = "0.4"
-users = "0.11"
 rand = "0.8"
 libc = "0.2"
 clap = { version = "4.4", features = ["derive"] }
+
+# Unix specific dependencies
+[target.'cfg(unix)'.dependencies]
+users = { version = "0.11" }
+
+# Windows specific dependencies
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = [
+    "winerror",
+    "handleapi",
+    "securitybaseapi",
+    "processthreadsapi",
+    "errhandlingapi",
+    "winuser",
+    "winbase",
+    "wincon",
+] }
+widestring = "1.0.2"
