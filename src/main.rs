@@ -568,8 +568,6 @@ fn am_i_root() -> bool {
 mod tests {
     use std::{env, sync::Arc};
 
-    use fiche_rs::windows::am_i_root_windows;
-
     use crate::{am_i_root, FicheSettings};
 
     #[test]
