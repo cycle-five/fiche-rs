@@ -407,11 +407,13 @@ fn generate_slug(settings: &FicheSettings) -> String {
 #[cfg(not(target_os = "windows"))]
 /// Change the current user to the requested user
 /// FIXME: Getting an error somewhere...
-fn perform_user_change(settings: &FicheSettings) -> Result<(), String> {
+fn perform_user_change(settings: &FicheSettings) -> Result<(), FicheError> {
     if let Some(user_name) = &settings.user_name {
         if !am_i_root() {
             print_error("Run as root if you want to change the user!");
-            return Err("User change requested but not running as root".to_string());
+            return Err(FicheError::from(
+                "User change requested but not running as root".to_string(),
+            ));
         }
 
         let uid = get_uid_by_name(user_name)
@@ -428,15 +430,17 @@ fn perform_user_change(settings: &FicheSettings) -> Result<(), String> {
     Ok(())
 }
 #[cfg(target_os = "windows")]
-fn perform_user_change(settings: &FicheSettings) -> Result<(), String> {
+fn perform_user_change(settings: &FicheSettings) -> Result<(), FicheError> {
     if let Some(_user_name) = &settings.user_name {
         if !am_i_root() {
             print_error("Run as root if you want to change the user!");
-            return Err("User change requested but not running as root".to_string());
+            return Err(FicheError::from(
+                "User change requested but not running as root".to_string(),
+            ));
         }
     }
 
-    Err("Unimplemented for Windows".to_string())
+    Err(FicheError::from("Unimplemented for Windows".to_string()))
 }
 
 #[cfg(not(target_os = "windows"))]
