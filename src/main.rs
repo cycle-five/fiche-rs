@@ -408,6 +408,8 @@ fn generate_slug(settings: &FicheSettings) -> String {
 /// Change the current user to the requested user
 /// FIXME: Getting an error somewhere...
 fn perform_user_change(settings: &FicheSettings) -> Result<(), FicheError> {
+    use std::f32::consts::E;
+
     if let Some(user_name) = &settings.user_name {
         if !am_i_root() {
             print_error("Run as root if you want to change the user!");
@@ -425,10 +427,12 @@ fn perform_user_change(settings: &FicheSettings) -> Result<(), FicheError> {
         set_current_gid(gid).map_err(|e| e.to_string())?;
 
         print_status(&format!("User changed to: {}.", user_name));
+        Ok(())
+    } else {
+        Err(FicheError::from("No user name".to_string()))
     }
-
-    Ok(())
 }
+
 #[cfg(target_os = "windows")]
 fn perform_user_change(settings: &FicheSettings) -> Result<(), FicheError> {
     if let Some(_user_name) = &settings.user_name {
