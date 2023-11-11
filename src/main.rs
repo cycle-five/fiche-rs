@@ -10,6 +10,7 @@ use std::time::{self, Duration};
 
 // #[cfg(target_os = "windows")]
 // use ::windows;
+#[allow(unused_imports)]
 #[cfg(target_os = "windows")]
 use fiche_rs::windows::am_i_root_windows;
 // use std::ffi::c_long;
@@ -54,13 +55,13 @@ use clap::Parser;
 impl Default for FicheSettings {
     fn default() -> Self {
         FicheSettings {
-            domain: "example.com".to_string(),
+            domain: "localhost".to_string(),
             output_dir: "code".to_string(),
             listen_addr: "0.0.0.0".to_string(),
             port: 9999,
             slug_len: 4,
             https: false,
-            buffer_len: 32768,
+            buffer_len: 32768, // 2 << 14
             user_name: None,
             log_file_path: None,
             banlist_path: None,
@@ -311,24 +312,30 @@ fn dispatch_connection(socket: TcpStream, settings: Arc<FicheSettings>) -> Resul
 }
 
 /// Check if IP is banned
-fn is_banned(connection: &FicheConnection) -> bool {
+fn is_banned(connection: &FicheConnection) -> Result<bool, FicheError> {
+    if !connection.address.is_some() {
+        return Err(FicheError::from("No IP Address".to_string()));
+    }
     if let Some(banlist_path) = &connection.settings.banlist_path {
-        let banlist = fs::read_to_string(banlist_path).unwrap();
-        let ip = connection.address.expect("No IP.").ip().to_string();
-        banlist.contains(&ip)
+        let banlist = fs::read_to_string(banlist_path)?;
+        let ip = connection.address.unwrap().ip().to_string();
+        Ok(banlist.contains(&ip))
     } else {
-        false
+        Ok(false)
     }
 }
 
 /// Check if IP is whitelisted
-fn is_whitelisted(connection: &FicheConnection) -> bool {
+fn is_whitelisted(connection: &FicheConnection) -> Result<bool, FicheError> {
+    if !connection.address.is_some() {
+        return Err(FicheError::from("No IP Address".to_string()));
+    }
     if let Some(whitelist_path) = &connection.settings.whitelist_path {
-        let whitelist = fs::read_to_string(whitelist_path).unwrap();
-        let ip = connection.address.expect("No IP").ip().to_string();
-        whitelist.contains(&ip)
+        let whitelist = fs::read_to_string(whitelist_path)?;
+        let ip = connection.address.unwrap().ip().to_string();
+        Ok(whitelist.contains(&ip))
     } else {
-        false
+        Ok(false)
     }
 }
 
@@ -347,7 +354,7 @@ fn handle_connection(mut connection: FicheConnection) -> Result<(), FicheError> 
     ));
 
     // check if IP is banned
-    if is_banned(&connection) && !is_whitelisted(&connection) {
+    if is_banned(&connection)? && !is_whitelisted(&connection)? {
         print_error(&format!("{} is banned!", ip));
         return Err(FicheError::from("IP is banned!".to_string()));
     }
@@ -562,24 +569,22 @@ fn get_date() -> String {
 
 /// Check if we're running as root
 fn am_i_root() -> bool {
-    #[cfg(target_os = "windows")]
-    return am_i_root_windows();
-    #[cfg(not(target_os = "windows"))]
-    unsafe {
-        libc::getuid() == 0
-    }
+    whoami::username() == "root" || whoami::username() == "Administrator"
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::{
+        net::{Ipv4Addr, SocketAddr},
+        sync::Arc,
+    };
 
     use crate::{am_i_root, FicheSettings};
 
     #[test]
     fn test_fiche_settings_defaults() {
         let default_settings = FicheSettings::default();
-        assert_eq!(default_settings.domain, "example.com");
+        assert_eq!(default_settings.domain, "localhost");
         assert_eq!(default_settings.output_dir, "code");
         assert_eq!(default_settings.listen_addr, "0.0.0.0");
         assert_eq!(default_settings.port, 9999);
@@ -677,19 +682,39 @@ mod tests {
         let mut settings = FicheSettings::default();
         let _ = crate::set_host_name(&settings.domain);
         crate::set_domain_name(&mut settings);
-        assert_eq!(settings.domain, "http://example.com");
+        assert_eq!(settings.domain, "http://localhost");
     }
 
     #[test]
-    fn test_is_banned() {
+    fn test_is_banned_err() {
         let settings = Arc::new(FicheSettings::default());
+        // Handing a connection with no actual socket or connection should
+        // raise and error in these functions.
         let connection = crate::FicheConnection {
             socket: None,
             address: None,
             settings: settings.clone(),
         };
         let result = crate::is_banned(&connection);
-        assert_eq!(result, false);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_is_banned() {
+        let settings = Arc::new(FicheSettings::default());
+        // Handing a connection with no actual socket or connection should
+        // raise and error in these functions.
+        let connection = crate::FicheConnection {
+            socket: None,
+            address: Some(SocketAddr::new(
+                std::net::IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1).into()),
+                8080,
+            )),
+            settings: settings.clone(),
+        };
+        let result = crate::is_banned(&connection);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), false);
     }
 
     #[test]
@@ -697,11 +722,15 @@ mod tests {
         let settings = Arc::new(FicheSettings::default());
         let connection = crate::FicheConnection {
             socket: None,
-            address: None,
+            address: Some(SocketAddr::new(
+                std::net::IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1).into()),
+                8080,
+            )),
             settings: settings.clone(),
         };
         let result = crate::is_whitelisted(&connection);
-        assert_eq!(result, false);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), false);
     }
 
     #[test]
