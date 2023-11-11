@@ -137,6 +137,6 @@ pub fn am_i_root_windows() -> bool {
         }
 
         // If the elevation token is nonzero, the user has administrative rights
-        return elevation.TokenIsElevated != 0;
+        elevation.TokenIsElevated != 0
     }
 }

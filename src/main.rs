@@ -408,8 +408,6 @@ fn generate_slug(settings: &FicheSettings) -> String {
 /// Change the current user to the requested user
 /// FIXME: Getting an error somewhere...
 fn perform_user_change(settings: &FicheSettings) -> Result<(), FicheError> {
-    use std::f32::consts::E;
-
     if let Some(user_name) = &settings.user_name {
         if !am_i_root() {
             print_error("Run as root if you want to change the user!");
