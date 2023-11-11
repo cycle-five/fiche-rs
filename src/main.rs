@@ -685,19 +685,6 @@ mod tests {
     }
 
     #[test]
-    fn test_perform_user_change() {
-        let settings = FicheSettings::default();
-        let result = crate::perform_user_change(&settings);
-
-        // This can't be good practice can it?
-        if am_i_root() {
-            assert!(result.is_ok());
-        } else {
-            assert!(result.is_err());
-        }
-    }
-
-    #[test]
     fn test_is_banned() {
         let settings = Arc::new(FicheSettings::default());
         let connection = crate::FicheConnection {
@@ -736,6 +723,19 @@ mod tests {
     fn test_set_host_name() {
         let result = crate::set_host_name("helheim");
         if am_i_root() {
+            assert!(result.is_ok());
+        } else {
+            assert!(result.is_err());
+        }
+    }
+
+    #[test]
+    fn test_perform_user_change() {
+        let settings = FicheSettings::default();
+        let result = crate::perform_user_change(&settings);
+
+        // This can't be good practice can it?
+        if am_i_root() && cfg!(not(target_os = "windows")) {
             assert!(result.is_ok());
         } else {
             assert!(result.is_err());
