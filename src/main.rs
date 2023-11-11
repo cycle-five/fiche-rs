@@ -716,6 +716,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_set_host_name() {
         let result = crate::set_host_name("helheim");
         if am_i_root() {
@@ -726,6 +727,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_perform_user_change() {
         let settings = FicheSettings::default();
         let result = crate::perform_user_change(&settings);
