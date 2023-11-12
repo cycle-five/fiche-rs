@@ -94,6 +94,7 @@ pub fn get_user_sid_by_name(user_name: &str) -> Option<PSID> {
 }
 
 /// Check if the current process has administrative rights.
+#[allow(unused)]
 pub fn am_i_root_windows() -> bool {
     unsafe {
         // Open a handle to the current process
