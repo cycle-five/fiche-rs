@@ -427,7 +427,7 @@ fn perform_user_change(settings: &FicheSettings) -> Result<(), FicheError> {
         print_status(&format!("User changed to: {}.", user_name));
         Ok(())
     } else {
-        Err(FicheError::from("No user name".to_string()))
+        Ok(())
     }
 }
 
