@@ -3,15 +3,6 @@ name = "fiche-rs"
 version = "0.2.0"
 edition = "2021"
 
-[features]
-default = []
-shuttle = [
-    "dep:shuttle-runtime",
-    "dep:axum",
-    "dep:shuttle-axum",
-    "dep:tokio",
-    "dep:tower-http",
-]
 
 [dependencies]
 chrono = "0.4.33"
@@ -20,12 +11,18 @@ libc = "0.2.153"
 hostname = { version = "0.3.1", features = ["set"] }
 clap = { version = "4.5.0", features = ["derive"] }
 
-# Optional shuttle dependencies
+# Common optional shuttle dependencies
 shuttle-runtime = { version = "0.38.0", optional = true }
+tokio = { version = "1.36.0", optional = true }
+
+# Optional shuttle / acum dependencies
 axum = { version = "0.7.4", optional = true }
 shuttle-axum = { version = "0.38.0", optional = true }
-tokio = { version = "1.36.0", optional = true }
 tower-http = { version = "0.5.1", features = ["fs"], optional = true }
+
+# Optional shuttle / rocket dependencies
+rocket = { version = "0.5.0", optional = true }
+shuttle-rocket = { version = "0.38.0", optional = true }
 
 # Unix specific dependencies
 [target.'cfg(unix)'.dependencies]
@@ -44,3 +41,21 @@ winapi = { version = "0.3.9", features = [
     "wincon",
 ] }
 widestring = "1.0.2"
+
+[features]
+default = []
+shuttle-axum = [
+    "axum",
+    "shuttle-runtime",
+    "shuttle-axum",
+    "tokio",
+    "tower-http",
+]
+
+shuttle-rocket = [
+    "rocket",
+    "shuttle-rocket",
+    "shuttle-runtime",
+    "tokio",
+    "shuttle-rocket",
+]
