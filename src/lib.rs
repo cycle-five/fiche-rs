@@ -1,3 +1,4 @@
+use clap::Parser;
 use rand::Rng;
 use std::error::Error;
 use std::fs::{self, File};
@@ -50,7 +51,6 @@ pub struct FicheSettings {
     pub whitelist_path: Option<String>,
 }
 
-use clap::Parser;
 /// semi-sane defaults, the program won't run under these settings howerever.
 /// FIXME
 impl Default for FicheSettings {
